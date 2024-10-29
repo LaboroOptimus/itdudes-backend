@@ -48,7 +48,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,   -- Email пользователя (уникальный и обязательный)
     username VARCHAR(100) UNIQUE NOT NULL,-- Никнейм пользователя (уникальный и обязательный)
     password VARCHAR(255) NOT NULL,       -- Пароль пользователя (обязательный)
-    registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP -- Дата регистрации (по умолчанию текущая дата и время)
+    registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Дата регистрации (по умолчанию текущая дата и время)
     isverified BOOLEAN DEFAULT false,
     verificationcode VARCHAR(255)
 );
