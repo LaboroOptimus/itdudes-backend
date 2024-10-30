@@ -11,17 +11,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Print SSH Key and Host for Debugging
-        env:
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-        run: |
-          echo "Debugging SSH Key and Host:"
-          echo "SSH Host: $SSH_HOST"
-          echo "SSH User: $SSH_USER"
-          echo "SSH Key (truncated): ${SSH_KEY:0:50}..."  # Выводим первые 50 символов ключа
-
       - name: Deploy to Timeweb
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -30,17 +19,13 @@ jobs:
         run: |
           echo "Starting deployment process..."
 
-          # Создаем временный файл для SSH-ключа
+          # Создаем временный файл для SSH-ключа и устанавливаем права доступа
           echo "$SSH_KEY" | tr -d '\r' > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
 
-          # Проверяем, что ключ был успешно создан
+          # Проверяем, что файл ключа успешно создан
           echo "SSH key written to /tmp/deploy_key"
-          ls -l /tmp/deploy_key  # Показываем, что файл создан
-          
-          # Тестируем соединение для отладки
-          echo "Testing SSH connection..."
-          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $SSH_USER@$SSH_HOST "echo 'SSH connection successful!'"
+          ls -l /tmp/deploy_key  # Логирование для проверки
 
           # Подключаемся к серверу и выполняем команды
           ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $SSH_USER@$SSH_HOST << 'EOF'
@@ -61,5 +46,5 @@ jobs:
 
             echo "Deployment commands completed."
           EOF
-          
+
           echo "Deployment process completed."
