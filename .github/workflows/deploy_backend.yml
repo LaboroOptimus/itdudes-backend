@@ -27,6 +27,10 @@ jobs:
           echo "SSH key written to /tmp/deploy_key"
           ls -l /tmp/deploy_key  # Логирование для проверки
 
+          # Тестируем SSH-подключение
+          echo "Testing SSH connection..."
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $SSH_USER@$SSH_HOST "echo 'SSH connection successful!'"
+
           # Подключаемся к серверу и выполняем команды
           ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $SSH_USER@$SSH_HOST << 'EOF'
             echo "Connected to server. Starting deployment commands..."
