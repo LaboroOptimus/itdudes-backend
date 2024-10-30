@@ -1,7 +1,7 @@
 name: Deploy Backend to Production
 
 on:
-  workflow_dispatch:  # Это позволяет запускать процесс вручную с кнопки "Run workflow" на GitHub
+  workflow_dispatch:  # Запуск процесса вручную с кнопки "Run workflow"
 
 jobs:
   deploy:
@@ -11,6 +11,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Print SSH Key and Host for Debugging
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          echo "Debugging SSH Key and Host:"
+          echo "SSH Host: $SSH_HOST"
+          echo "SSH User: $SSH_USER"
+          echo "SSH Key (truncated): ${SSH_KEY:0:50}..."  # Выводим первые 50 символов ключа
+
       - name: Deploy to Timeweb
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -18,23 +29,37 @@ jobs:
           SSH_KEY: ${{ secrets.SSH_KEY }}
         run: |
           echo "Starting deployment process..."
+
+          # Создаем временный файл для SSH-ключа
+          echo "$SSH_KEY" | tr -d '\r' > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+          # Проверяем, что ключ был успешно создан
+          echo "SSH key written to /tmp/deploy_key"
+          ls -l /tmp/deploy_key  # Показываем, что файл создан
           
+          # Тестируем соединение для отладки
+          echo "Testing SSH connection..."
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $SSH_USER@$SSH_HOST "echo 'SSH connection successful!'"
+
           # Подключаемся к серверу и выполняем команды
-          ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$SSH_HOST << 'EOF'
-            # Переход в директорию бекенда
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $SSH_USER@$SSH_HOST << 'EOF'
+            echo "Connected to server. Starting deployment commands..."
             cd /path/to/itdudes-backend
 
-            # Подтягиваем последние изменения из ветки develop
+            echo "Pulling latest changes from develop branch..."
             git fetch origin
             git rebase origin/develop
 
-            # Сборка проекта
+            echo "Installing dependencies and building project..."
             npm install
             npm run build
 
-            # Перезапуск контейнера в pm2
-            pm2 delete backend || true  # Удаляем существующий процесс, если он есть
+            echo "Restarting backend with pm2..."
+            pm2 delete backend || true
             pm2 start dist/index.js --name backend
+
+            echo "Deployment commands completed."
           EOF
           
-          echo "Deployment completed."
+          echo "Deployment process completed."
