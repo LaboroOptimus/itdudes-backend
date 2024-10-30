@@ -8,15 +8,18 @@ const knex = require('../knex');
 
 async function sendVerificationEmail(email, url) {
     const transporter = nodemailer.createTransport({
-        host: "sandbox.smtp.mailtrap.io",
-        port: 2525,
+        host: "smtp.timeweb.ru", // mail.timeweb.com
+        port: 465,
+        secure: true,
+        // logger: true,
+        // debug: true,
         auth: {
-            user: 'ba8166d73ff296',
-            pass: '1ba990fdec7181'
+            user: 'hi@itdudes.ru',
+            pass: 'Veritas03021997_'
         }
     });
     const mailOptions = {
-        from: 'noreply@your-domain.com',
+        from: 'hi@itdudes.ru',
         to: email,
         subject: 'Подтверждение регистрации',
         text: `Пожалуйста, перейдите по ссылке для подтверждения вашего аккаунта: ${url}`
@@ -53,16 +56,15 @@ class UserController {
         await knex('users').insert({
             email: email,
             password: hashedPassword,
-            username: name,
+            username: name, 
             verificationcode: verificationCode,
             isverified: false
         });
 
-        const verificationUrl = `http://${process.env.DB_HOST}/verify?code=${verificationCode}`; // Укажите свой домен и правильный роут
+        const verificationUrl = `http://${process.env.FRONT_HOST}/verify?code=${verificationCode}`; // Укажите свой домен и правильный роут
 
         // Функция отправки email (реализуйте по своему усмотрению)
         await sendVerificationEmail(email, verificationUrl);
-
     
         // Ответ об успешной регистрации
         res.status(201).json({ message: 'Пользователь успешно зарегистрирован', status: 'success' });
@@ -77,7 +79,6 @@ class UserController {
             const { email, password } = req.body;
             const errors = validationResult(req);
 
-            
     
             if (!errors.isEmpty()) {
                 return res.status(400).json({
@@ -118,7 +119,8 @@ class UserController {
 
     async verify(req, res){
         try {
-            const { code } = req.query;
+            const { code } = req.params;
+            console.log('VERIFY', code)
             const user = await knex('users').where({ verificationcode: code }).first();
     
             if (!user) {

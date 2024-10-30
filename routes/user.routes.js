@@ -28,7 +28,7 @@ router.post(
 );
 
 router.get(
-    '/verify',
+    '/verify/:code',
     userController.verify
 )
 

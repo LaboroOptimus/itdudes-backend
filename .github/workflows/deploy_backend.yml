@@ -1,0 +1,40 @@
+name: Deploy Backend to Production
+
+on:
+  workflow_dispatch:  # Это позволяет запускать процесс вручную с кнопки "Run workflow" на GitHub
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Deploy to Timeweb
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          echo "Starting deployment process..."
+          
+          # Подключаемся к серверу и выполняем команды
+          ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$SSH_HOST << 'EOF'
+            # Переход в директорию бекенда
+            cd /path/to/itdudes-backend
+
+            # Подтягиваем последние изменения из ветки develop
+            git fetch origin
+            git rebase origin/develop
+
+            # Сборка проекта
+            npm install
+            npm run build
+
+            # Перезапуск контейнера в pm2
+            pm2 delete backend || true  # Удаляем существующий процесс, если он есть
+            pm2 start dist/index.js --name backend
+          EOF
+          
+          echo "Deployment completed."
