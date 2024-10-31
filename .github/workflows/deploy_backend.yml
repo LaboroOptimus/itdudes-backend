@@ -29,10 +29,10 @@ jobs:
 
           # Тестируем SSH-подключение
           echo "Testing SSH connection..."
-          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $SSH_USER@$SSH_HOST "echo 'SSH connection successful!'"
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key -T $SSH_USER@$SSH_HOST "echo 'SSH connection successful!'"
 
           # Подключаемся к серверу и выполняем команды
-          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $SSH_USER@$SSH_HOST << EOF
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key -T $SSH_USER@$SSH_HOST << EOF
             echo "Connected to server. Starting deployment commands..."
             cd /path/to/itdudes-backend
 
