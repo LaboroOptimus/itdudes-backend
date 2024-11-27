@@ -3,6 +3,7 @@ const knex = require('../knex');
 
 class PostController {
 
+
     async getAllPosts(req, res) {
         try {
             // Валидация токена
@@ -43,10 +44,17 @@ class PostController {
                 .whereIn('postgoals.postid', postIds)
                 .select('postgoals.postid', 'goals.id as goalid', 'goals.title as goalTitle');
     
-            // Обогащение постов ролями и целями
+            // Получение данных для поля who_is_looking
+            const whoIsLookingIds = [...new Set(posts.map(post => post.who_is_looking))];
+            const whoIsLookingData = await knex('roles')
+                .whereIn('id', whoIsLookingIds)
+                .select('id', 'title');
+    
+            // Обогащение постов ролями, целями и данными для who_is_looking
             posts.forEach(post => {
                 post.roles = roles.filter(role => role.postid === post.id).map(role => ({ id: role.roleid, title: role.roleTitle }));
                 post.goals = goals.filter(goal => goal.postid === post.id).map(goal => ({ id: goal.goalid, title: goal.goalTitle }));
+                post.who_is_looking = whoIsLookingData.filter(role => role.id === post.who_is_looking).map(role => ({ id: role.id, title: role.title }));
             });
     
             res.status(200).json({ status: 'success', data: posts });
@@ -56,61 +64,6 @@ class PostController {
         }
     }
     
-
-    // async createPost(req, res) {
-    //     const { title, description, city, contacts, who_is_looking, roles, goals } = req.body; // Новое поле who_is_looking добавлено
-    //     const token = req.headers.authorization.split(' ')[1];
-    //     const decoded = jwt.verify(token, 'your_secret_key'); // Проверка ключа токена
-    
-    //     if (!decoded) {
-    //         return res.status(401).json({ message: 'Unauthorized' });
-    //     }
-    
-    //     if (!who_is_looking || !roles?.length || !goals?.length) {
-    //         return res.status(400).json({ message: 'Who is looking, roles and goals are required', status: 'error' });
-    //     }
-    
-    //     const creator = decoded.userId; // Идентификатор пользователя из токена
-    
-    //     try {
-    //         await knex.transaction(async trx => {
-    //             // Создание поста с полем who_is_looking
-    //             const [postid] = await trx('posts').insert({
-    //                 title,
-    //                 description,
-    //                 city,
-    //                 contacts,
-    //                 creator,
-    //                 who_is_looking // Роль человека, который ищет
-    //             }, 'id'); // Возвращаем id созданного поста
-    
-    //             // Создание записей в таблице postroles (включаем роль "кто ищет")
-    //             const postRoles = [
-    //                 { postid: postid.id, roleid: who_is_looking }, // Роль того, кто ищет
-    //                 ...roles.map(roleid => ({
-    //                     postid: postid.id,
-    //                     roleid // Роли того, кого ищут
-    //                 }))
-    //             ];
-    
-    //             await trx('postroles').insert(postRoles);
-    
-    //             // Создание записей в таблице postgoals
-    //             const postGoals = goals.map(goalid => ({
-    //                 postid: postid.id,
-    //                 goalid
-    //             }));
-    
-    //             await trx('postgoals').insert(postGoals);
-    
-    //         });
-    
-    //         res.status(201).json({ message: 'Post created successfully', status: 'success' });
-    //     } catch (error) {
-    //         console.error(error);
-    //         res.status(500).json({ message: 'Internal server error' });
-    //     }
-    // }
     
     async createPost(req, res) {
         const { title, description, city, contacts, who_is_looking, roles, goals } = req.body; // Новое поле who_is_looking добавлено
@@ -172,7 +125,6 @@ class PostController {
         }
     }
     
-
     async getPostById(req, res) {
         try {
             // Валидация токена
@@ -224,75 +176,59 @@ class PostController {
         }
     }
 
+
     async getFilteredPosts(req, res) {
         try {
-            // Валидация токена
-            const token = req.headers.authorization?.split(" ")[1]; // Предполагается формат 'Bearer token'
+            const token = req.headers.authorization?.split(" ")[1];
             if (!token) {
                 return res.status(401).json({ message: 'Токен не предоставлен', status: 'error' });
             }
     
             try {
-                const decodedToken = jwt.verify(token, 'your_secret_key');
-                // Здесь может быть дополнительная логика проверки наличия необходимых прав или ролей
+                jwt.verify(token, 'your_secret_key');
             } catch (error) {
                 return res.status(401).json({ message: 'Невалидный токен', status: 'error' });
             }
     
-            // Получаем фильтры из тела запроса
-            const {  roles = [] } = req.body; // Переданные массивы целей и ролей (если есть)
-            const who_is_looking = parseInt(req.body.who_is_looking, 10);
-            const goals = req.body.goals.map(goal => parseInt(goal, 10));
-
+            const { roles = [] } = req.body; // Массив ролей
+            const who_is_looking = parseInt(req.body.who_is_looking, 10); // Кто ищет
+            const goals = req.body.goals.map((goal) => parseInt(goal.id, 10)); // Преобразуем goals в массив чисел
+            const roleIds = roles.map((role) => parseInt(role.id, 10)); // Преобразуем roles в массив чисел
+    
             const page = parseInt(req.query.page) || 1;
             const limit = 20;
             const offset = (page - 1) * limit;
     
-            // Запрос для получения постов
             let query = knex('posts')
-                .select('posts.*')  // Явно выбираем только поля из таблицы posts
+                .select('posts.*')
                 .offset(offset)
                 .limit(limit);
-
+    
             if (who_is_looking) {
-                query = query.where('posts.who_is_looking', who_is_looking); // Фильтрация по полю who_is_looking
-            }
-                
-            if (goals?.length > 0) {
-                    query = query
-                        .join('postgoals', 'posts.id', '=', 'postgoals.postid')
-                        .whereIn('postgoals.goalid', goals);
-            }
-            
-            if (roles && roles?.length > 0) {
-                if (Array.isArray(roles) && roles.length > 1) {
-                    // Если roles - это массив с несколькими значениями
-                    query = query
-                        .join('postroles', 'posts.id', '=', 'postroles.postid')
-                        .whereIn('postroles.roleid', roles);
-                } else {
-                    // Если это одно значение (или массив с одним значением)
-                    const role = Array.isArray(roles) ? roles[0] : roles;
-                    query = query
-                        .join('postroles', 'posts.id', '=', 'postroles.postid')
-                        .where('postroles.roleid', role);
-                }
+                query = query.where('posts.who_is_looking', who_is_looking);
             }
     
-            // Группируем по всем полям таблицы posts
-            query = query.groupBy('posts.id', 'posts.title', 'posts.description', 'posts.city', 'posts.contacts', 'posts.creator', 'posts.createdat');
+            if (goals.length > 0) {
+                query = query
+                    .join('postgoals', 'posts.id', '=', 'postgoals.postid')
+                    .whereIn('postgoals.goalid', goals); // Используем массив чисел
+            }
     
-            // Выполняем запрос
+            if (roleIds.length > 0) {
+                query = query
+                    .join('postroles', 'posts.id', '=', 'postroles.postid')
+                    .whereIn('postroles.roleid', roleIds); // Используем массив чисел
+            }
+    
+            query = query.groupBy('posts.id', 'posts.title', 'posts.description', 'posts.city', 'posts.contacts', 'posts.creator', 'posts.createdat', 'posts.who_is_looking');
+    
             const posts = await query;
-
-            
-             // Если постов нет
-            if (!posts || posts?.length === 0) {
+    
+            if (!posts || posts.length === 0) {
                 return res.status(200).json({ data: [], status: 'success' });
             }
     
-            // Получение ролей и целей для всех постов
-            const postIds = posts.map(post => post.id);
+            const postIds = posts.map((post) => post.id);
     
             const postRoles = await knex('postroles')
                 .join('roles', 'postroles.roleid', '=', 'roles.id')
@@ -304,10 +240,19 @@ class PostController {
                 .whereIn('postgoals.postid', postIds)
                 .select('postgoals.postid', 'goals.id as goalid', 'goals.title as goalTitle');
     
-            // Обогащение постов ролями и целями
-            posts.forEach(post => {
-                post.roles = postRoles.filter(role => role.postid === post.id).map(role => ({ id: role.roleid, title: role.roleTitle }));
-                post.goals = postGoals.filter(goal => goal.postid === post.id).map(goal => ({ id: goal.goalid, title: goal.goalTitle }));
+            // Получение данных для поля who_is_looking
+            const whoIsLookingIds = [...new Set(posts.map((post) => post.who_is_looking))];
+            const whoIsLookingData = await knex('roles')
+                .whereIn('id', whoIsLookingIds)
+                .select('id', 'title');
+    
+            // Обогащение постов ролями, целями и данными для who_is_looking
+            posts.forEach((post) => {
+                post.roles = postRoles.filter((role) => role.postid === post.id).map((role) => ({ id: role.roleid, title: role.roleTitle }));
+                post.goals = postGoals.filter((goal) => goal.postid === post.id).map((goal) => ({ id: goal.goalid, title: goal.goalTitle }));
+                post.who_is_looking = whoIsLookingData
+                    .filter((role) => role.id === post.who_is_looking)
+                    .map((role) => ({ id: role.id, title: role.title })); // Преобразуем в массив объектов
             });
     
             res.status(200).json({ status: 'success', data: posts });
@@ -316,6 +261,7 @@ class PostController {
             res.status(500).json({ message: 'Внутренняя ошибка сервера' });
         }
     }
+    
 
     async getRoles(req, res) {
         try {

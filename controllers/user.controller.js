@@ -78,7 +78,6 @@ class UserController {
         try {
             const { email, password } = req.body;
             const errors = validationResult(req);
-
     
             if (!errors.isEmpty()) {
                 return res.status(400).json({
@@ -103,7 +102,7 @@ class UserController {
             const isValidPassword = await bcrypt.compare(password, user.password);
             console.log(isValidPassword, password, user.password, 'isValid')
             if (!isValidPassword) {
-                return res.status(401).json({ message: 'Некорректные данные авторизации', status: 'error' });
+                return res.status(400).json({ message: 'Некорректные данные авторизации', status: 'error' });
             }
     
             // Генерация токена
